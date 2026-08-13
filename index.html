@@ -7,7 +7,7 @@
     <script>
         // Global error listener to capture any frontend exceptions during VM testing
         window.onerror = function(message, source, lineno, colno, error) {
-            alert(`⚠️ Browser JS Error!\n\nMsg: ${message}\nFile: ${source.split('/').pop()}\nLine: ${lineno}\nStack: ${error ? error.stack.substring(0, 200) + '...' : 'N/A'}`);
+            alert(` Browser JS Error!\n\nMsg: ${message}\nFile: ${source.split('/').pop()}\nLine: ${lineno}\nStack: ${error ? error.stack.substring(0, 200) + '...' : 'N/A'}`);
             return false;
         };
     </script>
@@ -232,8 +232,8 @@
                 <img id="promptMaterialImg" class="hidden absolute inset-0 w-full h-full object-contain z-30 transition-opacity duration-500 opacity-0 pointer-events-none" src="final_vid/prompt_material.png" alt="提示换材质" />
                 
                 <!-- Floating Huxuan Dance/Spin Banner Prompt (Bottom Opaque, GPU Promoted) -->
-                <div id="huxuanPromptBanner" class="hidden absolute bottom-6 left-1/2 z-50 bg-black border border-[#d4af37]/30 px-24 py-2 rounded-full text-white text-xl md:text-2xl font-normal tracking-[0.8em] shadow-[0_4px_20px_rgba(0,0,0,0.5)] transition-opacity duration-500 opacity-0 pointer-events-none font-classical text-center leading-[1.6]" style="transform: translateX(-50%) translateZ(0); will-change: opacity, transform;">
-                    复刻舞姿 跟随旋转 共演胡旋乐舞
+                <div id="huxuanPromptBanner" class="hidden absolute bottom-6 left-1/2 z-50 px-16 md:px-20 py-2.5 rounded-full text-white text-lg md:text-xl font-normal tracking-[0.4em] shadow-[0_0_25px_rgba(66,133,244,0.35)] transition-opacity duration-500 opacity-0 pointer-events-none text-center leading-[1.6]" style="transform: translateX(-50%) translateZ(0); will-change: opacity, transform; background: linear-gradient(135deg, rgba(15,15,15,0.92), rgba(0,0,0,0.96)) padding-box, linear-gradient(90deg, #4285F4, #EA4335, #FBBC05, #34A853) border-box; border: 2px solid transparent; font-family: 'Noto Sans SC', sans-serif;">
+                    正在识别衣裳色彩... 唤醒乐俑中
                 </div>
                 
                 <!-- Outro Pure White Center Blessing (State: OUTRO_VIDEO End) -->
@@ -299,7 +299,7 @@
                 <!-- Floating On-Screen Debug Logger (Inside Stage Overlay) -->
                 <div id="onScreenLogger" class="absolute bottom-20 left-4 z-50 w-96 h-48 bg-black bg-opacity-95 border border-green-500/50 rounded-lg p-2.5 text-[9px] font-mono text-green-400 overflow-y-auto shadow-2xl flex flex-col">
                     <div class="flex justify-between border-b border-white/10 pb-1.5 mb-1.5 shrink-0">
-                        <span class="text-white font-semibold flex items-center gap-1">🔍 调试日志 (Debug Logs)</span>
+                        <span class="text-white font-semibold flex items-center gap-1"> 调试日志 (Debug Logs)</span>
                         <div class="flex gap-2">
                             <button onclick="copyAllDebugLogs()" class="text-amber-400 hover:text-amber-300 font-bold transition-all duration-200">📋 复制</button>
                             <button onclick="document.getElementById('logConsoleLines').innerHTML = ''" class="text-warning hover:text-warning-focus">清空</button>
@@ -505,6 +505,22 @@
                 globalAudioPlayer.volume = 0.6;
                 globalAudioPlayer.currentTime = seekTime;
                 globalAudioPlayer.playbackRate = speed; // Sync audio playback speed
+                
+                // Auto-align audio duration with active video player duration to prevent premature audio cutoff
+                if (activePlayer && activePlayer.duration > 0.5) {
+                    const checkSync = () => {
+                        if (globalAudioPlayer.duration > 0.5 && activePlayer.duration > 0.5) {
+                            const ratio = globalAudioPlayer.duration / activePlayer.duration;
+                            if (ratio > 0.85 && ratio < 1.15) {
+                                globalAudioPlayer.playbackRate = speed * ratio;
+                                console.log(`[Audio Sync 🎵] Auto-synced BGM speed to ${globalAudioPlayer.playbackRate.toFixed(3)}x (Audio: ${globalAudioPlayer.duration.toFixed(2)}s, Video: ${activePlayer.duration.toFixed(2)}s)`);
+                            }
+                        }
+                    };
+                    if (globalAudioPlayer.readyState >= 1) checkSync();
+                    else globalAudioPlayer.onloadedmetadata = checkSync;
+                }
+                
                 globalAudioPlayer.play().catch(e => console.warn("[Audio Sync] Play failed:", e));
             } else {
                 console.log(`[Audio Sync] No matching BGM for ${videoSrc}. Stopping audio.`);
@@ -542,7 +558,7 @@
                     }
                     if (navigator.clipboard && navigator.clipboard.writeText) {
                         navigator.clipboard.writeText(lines).then(() => {
-                            showToast("✅ 已复制全部调试日志到剪贴板！", "success");
+                            showToast(" 已复制全部调试日志到剪贴板！", "success");
                         }).catch(() => fallbackCopyText(lines));
                     } else {
                         fallbackCopyText(lines);
@@ -558,7 +574,7 @@
                     textarea.select();
                     try {
                         document.execCommand('copy');
-                        showToast("✅ 已复制全部调试日志到剪贴板！", "success");
+                        showToast(" 已复制全部调试日志到剪贴板！", "success");
                     } catch (e) {
                         showToast("❌ 复制失败，请手动选择文字复制", "error");
                     }
@@ -599,16 +615,21 @@
                 
                 // Allow toggling debug console with "d" key & copying logs with "c" key
                 window.addEventListener('keydown', (e) => {
-                    if (e.key === 'd' || e.key === 'D') {
-                        const logger = document.getElementById('onScreenLogger');
-                        if (logger) logger.classList.toggle('hidden');
-                    }
-                    if (e.key === 'c' || e.key === 'C') {
-                        if (typeof window.copyAllDebugLogs === 'function') {
-                            window.copyAllDebugLogs();
-                        }
-                    }
-                });
+            const colorMap = {
+                '1': 'red',
+                '2': 'blue',
+                '3': 'gray',
+                '4': 'black',
+                '5': 'white'
+            };
+            if (colorMap[e.key]) {
+                const color = colorMap[e.key];
+                window.selectedFigurineKey = color;
+                window.matchedFigurineId = color;
+                const fig = FIGURINES_DB[color];
+                console.log(`[Keyboard Shortcut] Manually set Tang figurine color to: ${color} (${fig ? fig.name : ''})`);
+            }
+        });
                 
                 console.log("[Orchestrator] On-screen debugger successfully hooked to console channels. Press 'd' to toggle, 'c' to copy all logs.");
             });
@@ -631,8 +652,8 @@
             toast.className = `alert alert-${type} shadow-lg text-sm transition-all duration-300 transform translate-y-4 opacity-0 z-[1000]`;
             
             let icon = '💡';
-            if (type === 'success') icon = '✅';
-            if (type === 'error' || type === 'warning') icon = '⚠️';
+            if (type === 'success') icon = '';
+            if (type === 'error' || type === 'warning') icon = '';
             
             toast.innerHTML = `<div><span>${icon} ${message}</span></div>`;
             container.appendChild(toast);
@@ -760,7 +781,7 @@
         /**
          * Seamless Double-Buffered Video Player Helper
          */
-        function playSeamlessVideo(src, loop = false, blendMode = 'normal', onendedCallback = null, freezeTimeRemaining = 0.06) {
+        function playSeamlessVideo(src, loop = false, blendMode = 'normal', onendedCallback = null, freezeAtEnd = true, freezeTimeRemaining = 0.06) {
             return new Promise((resolve, reject) => {
                 const playerA = document.getElementById('videoPlayerA');
                 const playerB = document.getElementById('videoPlayerB');
@@ -775,10 +796,10 @@
                 
                 console.log(`[Video Loading 🎥] Switching source -> ${src} (loop: ${loop}, blend: ${blendMode})`);
                 
-                // Keep nextPlayer completely transparent while loading in background
-                nextPlayer.style.opacity = '0';
-                nextPlayer.classList.remove('opacity-100');
-                nextPlayer.classList.add('opacity-0');
+                // Ensure nextPlayer is visible immediately to avoid black screen
+                nextPlayer.classList.remove('opacity-0');
+                nextPlayer.classList.add('opacity-100');
+                nextPlayer.style.opacity = '1';
                 
                 if (!nextPlayer.src || !nextPlayer.src.includes(src) || nextPlayer.error || nextPlayer.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) {
                     nextPlayer.src = src;
@@ -787,7 +808,8 @@
                 nextPlayer.loop = loop;
                 nextPlayer.style.mixBlendMode = blendMode;
                 nextPlayer.currentTime = 0;
-                nextPlayer.playbackRate = 1.0; // Reset playback rate
+                nextPlayer.playbackRate = 1.0;
+                try { nextPlayer.pause(); } catch(e){} // Reset playback rate
                 nextPlayer.ontimeupdate = null; // Clear old listeners
                 nextPlayer.onended = null;
                 
@@ -809,7 +831,7 @@
                 };
 
                 nextPlayer.onplaying = function() {
-                    console.log(`[Video Loading ✅] Video playing & fading in: ${src} (Player: ${nextPlayer.id})`);
+                    console.log(`[Video Loading ] Video playing & fading in: ${src} (Player: ${nextPlayer.id})`);
                     nextPlayer.classList.remove('opacity-0');
                     nextPlayer.classList.add('opacity-100');
                     nextPlayer.style.opacity = '1';
@@ -830,7 +852,7 @@
                     if (curtainOverlay && parseFloat(curtainOverlay.style.opacity) > 0 && !src.includes('curtain.mp4')) {
                         curtainOverlay.style.transition = 'opacity 500ms ease-in-out';
                         curtainOverlay.style.opacity = '0';
-                        setTimeout(() => { try { curtainOverlay.pause(); } catch(e){} }, 500);
+                        setTimeout(() => { try { curtainOverlay.pause(); } catch(e){} }, 2500);
                     }
                     
                     // Only hide previous player AFTER next player has rendered active frames!
@@ -856,7 +878,7 @@
                         console.log(`[Video Loading 🏁] Video ended (native ended event): ${src}`);
                         try {
                             nextPlayer.currentTime = Math.max(0, nextPlayer.duration - freezeTimeRemaining);
-                            nextPlayer.playbackRate = 0.1;
+                            nextPlayer.pause();
                         } catch(e) {
                             console.warn("Failed to seek back on ended fallback:", e);
                         }
@@ -874,8 +896,15 @@
                         if (nextPlayer.duration > 0.5 && nextPlayer.currentTime >= nextPlayer.duration - freezeTimeRemaining) {
                             nextPlayer.ontimeupdate = null;
                             nextPlayer.onended = null;
-                            nextPlayer.playbackRate = 0.1;
-                            console.log(`[Video Loading 🏁] Video ended (frozen on last frame): ${src}`);
+                            if (freezeAtEnd) {
+                                nextPlayer.pause();
+                                if (globalAudioPlayer && !globalAudioPlayer.paused && !loop) {
+                                    globalAudioPlayer.pause();
+                                }
+                                console.log(`[Video Loading 🏁] Video ended (frozen on last frame): ${src}`);
+                            } else {
+                                console.log(`[Video Loading 🏁] Video finished seamlessly without freezing: ${src}`);
+                            }
                             if (onendedCallback) onendedCallback();
                             finish();
                         }
@@ -887,7 +916,7 @@
                     console.log(`[Video Loading ▶️] Play promise resolved for: ${src}`);
                     if (loop) finish();
                 }).catch(e => {
-                    console.warn(`[Video Loading ⚠️] Play failed with audio for ${src}, retrying muted fallback:`, e);
+                    console.warn(`[Video Loading ] Play failed with audio for ${src}, retrying muted fallback:`, e);
                     nextPlayer.muted = true;
                     nextPlayer.play().then(() => {
                         if (loop) finish();
@@ -919,6 +948,8 @@
                 stickerGift.classList.remove('show-sticker');
             }
             hideGuidancePrompt(); // Reset banner
+            if (window.colorBannerTimer) clearTimeout(window.colorBannerTimer);
+            if (window.matchBannerTimer) clearTimeout(window.matchBannerTimer);
             if (window.revealBannerTimer) clearTimeout(window.revealBannerTimer);
             if (window.outroBannerTimer) clearTimeout(window.outroBannerTimer);
             if (window.outroDelayTimer) clearTimeout(window.outroDelayTimer);
@@ -989,13 +1020,40 @@
             
             console.log("[State Machine] Starting cinematic flow -> INTRO_REVEAL");
             currentState = AppState.INTRO_REVEAL;
-            window.isColorLocked = true; // Lock color prediction so late background samples cannot overwrite matched color!
+            window.isColorLocked = true;
+            if (window.colorBannerTimer) clearTimeout(window.colorBannerTimer);
+            if (window.matchBannerTimer) clearTimeout(window.matchBannerTimer);
+            
+            // Show initial recognition prompt at 0.5s into curtain opening
+            window.colorBannerTimer = setTimeout(() => {
+                if (currentState === AppState.INTRO_REVEAL) {
+                    updateHuxuanPromptText("正在识别衣裳色彩... 唤醒乐俑中");
+                    showHuxuanPromptBanner();
+                }
+            }, 2500);
+
+            // 1. Play Curtain Video (video/curtain.mp4) first without freezing
+            console.log("[State Machine] Playing curtain video (video/curtain.mp4) seamlessly...");
+            try {
+                await playSeamlessVideo("video/curtain.mp4", false, "normal", null, false);
+            } catch (e) {
+                console.error("[State Machine] Play curtain video failed:", e);
+            }
+
+            // Lock color prediction so late background samples cannot overwrite matched color!
             if (mocap) mocap.pause();
             
             // Randomly select exactly one step (1, 2, or 3) to play its special Easter egg video in this session
-            window.specialStepIndex = Math.floor(Math.random() * 3) + 1;
-            console.log(`[State Machine] Special Easter egg selected for this session: Step ${window.specialStepIndex}`);
-            
+            const rand = Math.random();
+            if (rand < 0.40) {
+                window.specialStepIndex = 1; // 40% 概率: 蝴蝶彩蛋 (big_flower_to_round_special.mp4)
+            } else if (rand < 0.80) {
+                window.specialStepIndex = 2; // 40% 概率: 小狗彩蛋 (round_to_blue_flower_special.mp4)
+            } else {
+                window.specialStepIndex = 3; // 20% 概率: 落叶彩蛋 (blue_flower_to_stripe_special.mp4)
+            }
+            console.log(`[State Machine] Special Easter egg selected for this session: Step ${window.specialStepIndex} (rand=${rand.toFixed(2)})`);
+                        
             // Hide start overlay so it's not clickable anymore
             const startOverlay = document.getElementById('startOverlay');
             if (startOverlay) {
@@ -1005,28 +1063,30 @@
             const matchedId = window.matchedFigurineId || 'white';
             const figurine = FIGURINES_DB[matchedId] || FIGURINES_DB['white'];
             
-            const stageImg = document.getElementById('stageFigurineImg');
-            const curtainOverlay = document.getElementById('curtainOverlayPlayer');
-            const playerA = document.getElementById('videoPlayerA');
-            const playerB = document.getElementById('videoPlayerB');
-
-
-
-            // 1. Play Curtain Video sequentially
-            console.log("[State Machine] Playing curtain video sequentially...");
-            try {
-                await playSeamlessVideo("video/curtain.mp4", false, 'normal');
-            } catch (e) {
-                console.error("[State Machine] Play curtain video failed:", e);
-            } finally {
-                // Resume mocap immediately after curtain ends
-                if (mocap) mocap.resume();
-            }
-
             // 2. Prepare Figurine Reveal
-            const finalMatchedId = window.matchedFigurineId || matchedId || 'white';
+            const finalMatchedId = window.selectedFigurineKey || window.matchedFigurineId || matchedId || 'white';
+            window.matchedFigurineId = finalMatchedId;
             const finalFigurine = FIGURINES_DB[finalMatchedId] || FIGURINES_DB['white'];
-            console.log(`[State Machine] Curtain finished -> Playing reveal video: ${finalFigurine.revealVideo} (Color: ${finalFigurine.tags?.color || '白'})`);
+            const colorName = (finalFigurine && finalFigurine.tags && finalFigurine.tags.color) ? finalFigurine.tags.color : '白';
+            console.log(`[State Machine] Curtain finished -> Playing reveal video: ${finalFigurine.revealVideo} (Color: ${colorName})`);
+            
+            const COLOR_MATCH_POETIC_TEXTS = {
+                'red': '识别到红色穿搭 匹配绯红霓裳',
+                'blue': '识别到蓝色穿搭 匹配天青呈祥',
+                'gray': '识别到灰色穿搭 匹配黛灰流芳',
+                'black': '识别到黑色穿搭 匹配墨黑玄采',
+                'white': '识别到白色穿搭 匹配皎白霓裳'
+            };
+            
+            // Delay "识别到X色穿搭 匹配XX" banner text by 3.5s until color bursts on screen!
+            if (window.matchBannerTimer) clearTimeout(window.matchBannerTimer);
+            window.matchBannerTimer = setTimeout(() => {
+                if (currentState === AppState.INTRO_REVEAL) {
+                    const poeticText = COLOR_MATCH_POETIC_TEXTS[finalMatchedId] || `识别到${colorName}色穿搭 匹配三彩乐俑`;
+                    updateHuxuanPromptText(poeticText);
+                    showHuxuanPromptBanner();
+                }
+            }, 3500);
             
             const showPromptCallback = () => {
                 console.log("[State Machine] Reveal video ended -> STANDBY_WAIT (Raise Left Hand Challenge)");
@@ -1040,6 +1100,7 @@
                     void promptDance.offsetWidth; // Force reflow
                     promptDance.classList.add('opacity-100'); 
                 }
+                updateHuxuanPromptText("请举起手臂 复刻舞姿 共演胡旋乐舞"); 
                 showHuxuanPromptBanner();
                 
                 if (mocap) {
@@ -1074,13 +1135,8 @@
                     if (currentState === AppState.INTRO_REVEAL) {
                         preloadSpinVideos(finalFigurine.id);
                     }
-                }, 2000);
-                if (window.revealBannerTimer) clearTimeout(window.revealBannerTimer);
-                window.revealBannerTimer = setTimeout(() => {
-                    if (currentState === AppState.INTRO_REVEAL) {
-                        showHuxuanPromptBanner();
-                    }
-                }, 9000);
+                }, 3500);
+                
                 await playSeamlessVideo(finalFigurine.revealVideo, false, 'normal', showPromptCallback);
             } catch (e) {
                 console.error("[State Machine] Play reveal video failed:", e);
@@ -1095,6 +1151,8 @@
             if (promptDance) promptDance.classList.add('hidden');
             const promptMat = document.getElementById('promptMaterialImg');
             if (promptMat) promptMat.classList.add('hidden');
+            if (window.colorBannerTimer) clearTimeout(window.colorBannerTimer);
+            if (window.matchBannerTimer) clearTimeout(window.matchBannerTimer);
             if (window.revealBannerTimer) clearTimeout(window.revealBannerTimer);
             if (window.outroBannerTimer) clearTimeout(window.outroBannerTimer);
             hideHuxuanPromptBanner(); // Hide immediately when outro video starts playing
@@ -1171,15 +1229,31 @@
             console.log("[State Machine] Blessing sequence active -> Lingering for 2s...");
             await new Promise(resolve => setTimeout(resolve, 2000));
             
-            // 3. Smoothly fade out the blessing overlay and curtain over 1s (1000ms)
+            // 3. Smoothly fade out the blessing overlay and curtain in sync with audio over 1.2s (1200ms)
             if (blessingOverlay) {
-                console.log("[State Machine] Lingering finished -> Fading out blessing overlay...");
-                blessingOverlay.style.transition = 'opacity 1000ms ease-in-out';
+                console.log("[State Machine] Lingering finished -> Fading out blessing overlay and BGM audio in sync...");
+                blessingOverlay.style.transition = 'opacity 1200ms ease-in-out';
                 blessingOverlay.classList.remove('opacity-100');
                 blessingOverlay.classList.add('opacity-0');
                 blessingOverlay.style.opacity = '0';
                 stopBlessingSparks();
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                if (globalAudioPlayer && !globalAudioPlayer.paused) {
+                    const startVol = globalAudioPlayer.volume;
+                    const startTime = Date.now();
+                    const fadeTimer = setInterval(() => {
+                        const elapsed = Date.now() - startTime;
+                        const ratio = Math.max(0, 1 - (elapsed / 1200));
+                        globalAudioPlayer.volume = startVol * ratio;
+                        if (ratio <= 0) {
+                            clearInterval(fadeTimer);
+                            globalAudioPlayer.pause();
+                            globalAudioPlayer.volume = startVol;
+                        }
+                    }, 30);
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 1200));
                 blessingOverlay.classList.add('hidden');
             }
             
@@ -1276,10 +1350,10 @@
                     if (typeof window.updateTrackingBadge === 'function') window.updateTrackingBadge("success", "手动触发跳舞");
                     triggerMainDance();
                 }
-                else if (currentState === AppState.DANCE_LOOP) {
-                    console.log("[State Machine] 🖱️ MANUAL CLICK BYPASS: Trigger Spin!");
-                    if (typeof window.updateTrackingBadge === 'function') window.updateTrackingBadge("success", "手动触发舞蹈");
-                    window.onUserSpin();
+                else if (currentState === AppState.DANCE_LOOP || currentState === AppState.WAITING_FOR_SPIN || currentState === AppState.WAITING_FOR_SPIN_RESUME) {
+                    console.log(`[State Machine] 🖱️ MANUAL CLICK BYPASS: Triggering Spin Transition from "${currentState}"`);
+                    if (typeof window.updateTrackingBadge === 'function') window.updateTrackingBadge("success", "手动触发换装");
+                    triggerSpinTransition();
                 }
                 else if (currentState === AppState.SPIN_LOOPING) {
                     console.log("[State Machine] 🖱️ MANUAL CLICK BYPASS: Trigger Stillness (End)!");
@@ -1374,6 +1448,8 @@
             }
             
             const showMatPromptCallback = () => {
+                updateHuxuanPromptText("请举起手臂 随音乐旋转 开启变身换装");
+                showHuxuanPromptBanner();
                 const promptMat = document.getElementById('promptMaterialImg');
                 if (promptMat) {
                     promptMat.classList.remove('hidden');
@@ -1382,7 +1458,7 @@
                 }
                 console.log(`[State Machine] Dance video ended. Transitioning to WAITING_FOR_SPIN. Waiting for user to spread arms.`);
                 currentState = AppState.WAITING_FOR_SPIN;
-                syncAudioWithVideo(null);
+                
                 
                 // Switch pose detection to "spread_arms" to trigger material change
                 if (mocap) {
@@ -1424,12 +1500,7 @@
             } else if (step === 4) {
                 spinVideoSrc = `video/stripe_to_${matchedId}.mp4`;
             }
-            if (step === 4) {
-                const banner = document.getElementById('huxuanPromptBanner');
-                if (banner) {
-                    banner.innerText = "体验结束，感谢您的参与";
-                }
-            }
+
             
             console.log(`[State Machine] Playing spin transition video (Step ${step + 1}/5): ${spinVideoSrc}`);
             
@@ -1444,6 +1515,8 @@
                 const step = spinVideoIndex % 5;
                 if (step === 4) {
                     console.log("[State Machine] Step 5/5 transition video finished (stripe_to_color) -> Loop cancelled. Freezing for 1s before OUTRO...");
+                    updateHuxuanPromptText("体验结束 感谢您的参与");
+                    showHuxuanPromptBanner();
                     spinVideoIndex = 0; // Reset index
                     currentState = AppState.WAITING_FOR_OUTRO_DELAY;
                     
@@ -1453,6 +1526,9 @@
                     }, 1000);
                     return; // Exit early
                 }
+                
+                updateHuxuanPromptText("请举起手臂 随音乐旋转 开启变身换装");
+                showHuxuanPromptBanner();
                 
                 if (promptMat) {
                     promptMat.classList.remove('hidden');
@@ -1465,7 +1541,8 @@
                 // Pause at end frame, DO NOT AUTO-LOOP. Require user to perform spread arms gesture again!
                 console.log(`[State Machine] Material video finished and frozen on last frame. Waiting for next spread arms gesture.`);
                 currentState = AppState.WAITING_FOR_SPIN_RESUME;
-                syncAudioWithVideo(null);
+                // Keep audio looping smoothly while waiting for next spin gesture instead of abrupt cutoff
+                
                 
                 if (mocap) {
                     mocap.activePoseKey = 'spread_arms';
@@ -1508,6 +1585,14 @@
             }, 300);
         }
 
+        
+        function updateHuxuanPromptText(text) {
+            const banner = document.getElementById('huxuanPromptBanner');
+            if (banner) {
+                banner.innerText = text;
+            }
+        }
+    
         function showHuxuanPromptBanner() {
             const banner = document.getElementById('huxuanPromptBanner');
             if (banner && banner.classList.contains('hidden')) {
@@ -1529,7 +1614,7 @@
                     if (banner.classList.contains('opacity-0')) {
                         banner.classList.add('hidden');
                     }
-                }, 500);
+                }, 2500);
             }
         }
 
@@ -1710,7 +1795,7 @@
                 // Default to moondream as per README, fallback to gemma
                 let modelName = "moondream";
                 try {
-                    const tagsRes = await fetchWithTimeout(`${cleanEndpoint}/api/tags`, { method: 'GET' }, 2000);
+                    const tagsRes = await fetchWithTimeout(`${cleanEndpoint}/api/tags`, { method: 'GET' }, 3500);
                     if (tagsRes.ok) {
                         const tagsJson = await tagsRes.json();
                         if (tagsJson.models && tagsJson.models.length > 0) {
@@ -1969,7 +2054,7 @@
             if (ready) {
                 btn.removeAttribute('disabled');
                 btn.className = "px-8 py-4 bg-[#1a1105]/95 text-amber-500 border-2 border-amber-500 rounded-full font-classical text-lg font-bold tracking-widest shadow-[0_0_30px_rgba(212,175,55,0.6)] transition-all duration-300 cursor-pointer hover:bg-amber-500 hover:text-black hover:scale-105 active:scale-95 animate-pulse";
-                textSpan.innerHTML = "✨ 时空共鸣，点击唤醒 ✨";
+                textSpan.innerHTML = " 时空共鸣，点击唤醒 ";
                 window.detectedColor = color;
             } else {
                 btn.setAttribute('disabled', 'true');
